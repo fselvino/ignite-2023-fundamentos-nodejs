@@ -3,7 +3,10 @@
 //ESModules => import/export
 
 import http from 'node:http'
+import {randomUUID} from 'node:crypto'
 import { Transform } from 'node:stream'
+import { Database } from './database.js'
+import { json } from './middlewares/json.js'
 
 /**
  * Criar usuarios
@@ -28,7 +31,8 @@ import { Transform } from 'node:stream'
  * HTTP Status code
  */
 
-const users = []
+const database = new Database
+
 
 class InverseNumberStream extends Transform {
   _transform(chunk, encoding, callback) {
@@ -41,36 +45,31 @@ class InverseNumberStream extends Transform {
 const server = http.createServer(async (req, res) => {
   const { method, url } = req
 
-  const buffer = []
-
-  for await (const chunk of req) {
-    buffer.push(chunk)
-  }
-
-  try {
-    req.body = JSON.parse(Buffer.concat(buffer).toString())
-  } catch {
-    req.body = null
-  }
-
-
+  await json(req, res)
   //console.log(body)
 
   if (method === 'GET' && url === '/users') {
+    const users = database.select('users')
+
+    console.log(database)
+
     return res
-      .setHeader('Content-type', 'application/json')
-      .end(JSON.stringify(users
-      ))
+      .end(JSON.stringify(users))
   }
 
   if (method === 'POST' && url === '/users') {
     const { name, email } = req.body
 
-    users.push({
-      id: 1,
+    const user = {
+      id: randomUUID(),
       name,
       email
-    })
+    }
+
+    
+
+    database.insert('users', user)
+
     return res.writeHead(201).end()
   }
 
