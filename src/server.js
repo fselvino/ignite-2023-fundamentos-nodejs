@@ -3,10 +3,9 @@
 //ESModules => import/export
 
 import http from 'node:http'
-import {randomUUID} from 'node:crypto'
 import { Transform } from 'node:stream'
-import { Database } from './database.js'
 import { json } from './middlewares/json.js'
+import { routes } from './routes.js'
 
 /**
  * Criar usuarios
@@ -31,7 +30,13 @@ import { json } from './middlewares/json.js'
  * HTTP Status code
  */
 
-const database = new Database
+//tres formas de nossa aplicaçao enviar informações para o back-end
+// Query Parameters - Parametros nomedos que enviamos no endereço da requisição
+// exp. http://localhost:3333/users?userId=1  uso - filtros, paginação, não-obrigatorios
+// Route Parameters - São usados para identificação de recurso
+// exp. GET http://localhost:3333/users/1
+// Request Body - É utilizado para envio de informações de um formulário
+// exp POST http://localhost:3333/users
 
 
 class InverseNumberStream extends Transform {
@@ -46,33 +51,20 @@ const server = http.createServer(async (req, res) => {
   const { method, url } = req
 
   await json(req, res)
-  //console.log(body)
 
-  if (method === 'GET' && url === '/users') {
-    const users = database.select('users')
+  const route = routes.find(route => {
+    return route.method === method && route.path.test(url)
+  })
 
-    console.log(database)
+  if (route) {
+    const routeParams = req.url.match(route.path)
 
-    return res
-      .end(JSON.stringify(users))
-  }
-
-  if (method === 'POST' && url === '/users') {
-    const { name, email } = req.body
-
-    const user = {
-      id: randomUUID(),
-      name,
-      email
-    }
-
+    req.params = {...routeParams.groups}
     
-
-    database.insert('users', user)
-
-    return res.writeHead(201).end()
+    return route.handler(req, res)
   }
 
+  //console.log(route)
   return res.writeHead(404).end()
 })
 
